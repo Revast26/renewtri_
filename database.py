@@ -98,3 +98,53 @@ def buscar_dados(query, params=()):
     dados = cursor.fetchall()
     conn.close()
     return dados
+
+
+def criar_dados_demo():
+    escola_existente = buscar_dados(
+        "SELECT id FROM escolas WHERE email = ?",
+        ("escola@renewtri.demo",)
+    )
+
+    if escola_existente:
+        return
+
+    codigo_escola = "ESC-DEMO1"
+
+    executar_query(
+        """
+        INSERT INTO escolas
+        (nome, email, cnpj, inep, senha, codigo_escola)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "CETI Prefeito João Mendes Olímpio de Melo",
+            "escola@renewtri.demo",
+            "12345678000190",
+            "12345678",
+            "renewtri123",
+            codigo_escola
+        )
+    )
+
+    escola = buscar_dados(
+        "SELECT id FROM escolas WHERE email = ?",
+        ("escola@renewtri.demo",)
+    )
+
+    escola_id = escola[0][0]
+
+    executar_query(
+        """
+        INSERT INTO merendeiras
+        (escola_id, nome, email, senha, ativo)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            escola_id,
+            "Robertina",
+            "robertina@renewtri.demo",
+            "merenda123",
+            1
+        )
+    )
