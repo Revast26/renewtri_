@@ -1,80 +1,129 @@
-import streamlit as st
 import pandas as pd
 import plotly.express as px
-import database
+import streamlit as st
+
+import database as db
+from utils import format_int, format_kg, format_percent, metric_card, page_header, plotly_layout
 
 
-def show_dashboard():
-    st.header("Dashboard")
+def calculate_metrics(production: pd.DataFrame, inventory: pd.DataFrame) -> dict[str, float]:
+    meals = float(production["refeicoes_produzidas"].sum()) if not production.empty else 0.0
+    waste = float(production["desperdicio_kg"].sum()) if not production.empty else 0.0
+    received = float(inventory["quantidade_kg"].sum()) if not inventory.empty else 0.0
+    waste_rate = (waste / meals * 100) if meals else 0.0
 
-    dados_producao = database.buscar_dados("""
-        SELECT data, refeicoes_produzidas, desperdicio_kg
-        FROM producao_alimentar
-        ORDER BY data
-    """)
+    if not production.empty:
+        production = production.copy()
+        production["data"] = pd.to_datetime(production["data"])
+        current_month = pd.Timestamp.today().to_period("M")
+        previous_month = current_month - 1
+        current_waste = production[production["data"].dt.to_period("M") == current_month]["desperdicio_kg"].sum()
+        previous_waste = production[production["data"].dt.to_period("M") == previous_month]["desperdicio_kg"].sum()
+        saved = max(float(previous_waste - current_waste), 0.0)
+    else:
+        saved = 0.0
 
-    dados_alimentos = database.buscar_dados("""
-        SELECT quantidade_kg
-        FROM alimentos_recebidos
-    """)
+    return {
+        "meals": meals,
+        "waste": waste,
+        "received": received,
+        "waste_rate": waste_rate,
+        "saved": saved,
+    }
 
-    if dados_producao:
-        df = pd.DataFrame(
-            dados_producao,
-            columns=["Data", "Refeições Produzidas", "Desperdício KG"]
+
+def show_dashboard(school_id: int) -> None:
+    page_header(
+        "Dashboard principal",
+        "Acompanhe produção, desperdício, estoque recebido e indicadores de sustentabilidade em tempo real.",
+        "Gestão inteligente da merenda",
+    )
+
+    production = db.production_df(school_id)
+    inventory = db.inventory_df(school_id)
+    metrics = calculate_metrics(production, inventory)
+
+    cols = st.columns(5)
+    with cols[0]:
+        metric_card("Refeições produzidas", format_int(metrics["meals"]), "Total registrado")
+    with cols[1]:
+        metric_card("Desperdício registrado", format_kg(metrics["waste"]), "Soma em kg")
+    with cols[2]:
+        metric_card("Alimentos recebidos", format_kg(metrics["received"]), "Entradas no estoque")
+    with cols[3]:
+        metric_card("Taxa de desperdício", format_percent(metrics["waste_rate"]), "Kg por refeição")
+    with cols[4]:
+        metric_card("Quilos economizados", format_kg(metrics["saved"]), "Comparação mensal")
+
+    if production.empty:
+        st.info("Ainda não há produção registrada. Use os cadastros para alimentar o dashboard.")
+        return
+
+    chart_df = production.copy()
+    chart_df["data"] = pd.to_datetime(chart_df["data"])
+    chart_df["semana"] = chart_df["data"].dt.to_period("W").astype(str)
+    chart_df["mes"] = chart_df["data"].dt.to_period("M").astype(str)
+
+    weekly = chart_df.groupby("semana", as_index=False)["desperdicio_kg"].sum()
+    monthly = chart_df.groupby("mes", as_index=False).agg(
+        refeicoes_produzidas=("refeicoes_produzidas", "sum"),
+        desperdicio_kg=("desperdicio_kg", "sum"),
+    )
+    monthly["taxa_desperdicio"] = monthly["desperdicio_kg"] / monthly["refeicoes_produzidas"] * 100
+
+    left, right = st.columns([1, 1])
+    with left:
+        fig = px.bar(
+            weekly.tail(10),
+            x="semana",
+            y="desperdicio_kg",
+            color_discrete_sequence=["#0f9f6e"],
+            labels={"semana": "Semana", "desperdicio_kg": "Desperdício (kg)"},
         )
-    else:
-        df = pd.DataFrame({
-            "Data": ["Seg", "Ter", "Qua", "Qui", "Sex"],
-            "Refeições Produzidas": [180, 200, 190, 210, 185],
-            "Desperdício KG": [12, 10, 8, 7, 6]
-        })
+        st.plotly_chart(plotly_layout(fig, "Desperdício semanal"), use_container_width=True)
 
-    total_refeicoes = int(df["Refeições Produzidas"].sum())
-    total_desperdicio = float(df["Desperdício KG"].sum())
+    with right:
+        fig = px.line(
+            monthly,
+            x="mes",
+            y="taxa_desperdicio",
+            markers=True,
+            color_discrete_sequence=["#0b6fb8"],
+            labels={"mes": "Mês", "taxa_desperdicio": "Taxa (%)"},
+        )
+        st.plotly_chart(plotly_layout(fig, "Evolução mensal da taxa de desperdício"), use_container_width=True)
 
-    if total_refeicoes > 0:
-        taxa_desperdicio = (total_desperdicio / total_refeicoes) * 100
-    else:
-        taxa_desperdicio = 0
-
-    if dados_alimentos:
-        total_alimentos = sum(item[0] for item in dados_alimentos)
-    else:
-        total_alimentos = 55
-
-    quilos_economizados = max(0, 50 - total_desperdicio)
-
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    col1.metric("🍽 Refeições", total_refeicoes)
-    col2.metric("🗑 Desperdício", f"{total_desperdicio:.1f} kg")
-    col3.metric("📦 Alimentos recebidos", f"{total_alimentos:.1f} kg")
-    col4.metric("📉 Taxa de desperdício", f"{taxa_desperdicio:.1f}%")
-    col5.metric("🌱 Kg economizados", f"{quilos_economizados:.1f} kg")
-
-    st.markdown("---")
-
-    st.subheader("📉 Desperdício semanal")
-
+    period_df = chart_df.sort_values("data").tail(28).copy()
+    period_df["periodo"] = period_df["data"].apply(
+        lambda value: "Últimos 14 dias" if value >= period_df["data"].max() - pd.Timedelta(days=13) else "14 dias anteriores"
+    )
+    comparison = period_df.groupby("periodo", as_index=False).agg(
+        refeicoes=("refeicoes_produzidas", "sum"),
+        desperdicio=("desperdicio_kg", "sum"),
+    )
+    comparison_long = comparison.melt(id_vars="periodo", var_name="indicador", value_name="valor")
     fig = px.bar(
-        df,
-        x="Data",
-        y="Desperdício KG",
-        text="Desperdício KG",
-        title="Desperdício registrado por dia"
+        comparison_long,
+        x="periodo",
+        y="valor",
+        color="indicador",
+        barmode="group",
+        color_discrete_map={"refeicoes": "#0b6fb8", "desperdicio": "#0f9f6e"},
+        labels={"periodo": "Período", "valor": "Total", "indicador": "Indicador"},
     )
+    st.plotly_chart(plotly_layout(fig, "Comparação entre períodos recentes"), use_container_width=True)
 
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.subheader("🍽 Refeições produzidas")
-
-    fig2 = px.line(
-        df,
-        x="Data",
-        y="Refeições Produzidas",
-        markers=True,
-        title="Evolução da produção alimentar"
+    st.subheader("Últimos registros")
+    st.dataframe(
+        production.head(8),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "data": "Data",
+            "turno": "Turno",
+            "refeicoes_produzidas": "Refeições",
+            "desperdicio_kg": "Desperdício (kg)",
+            "alimentos_utilizados": "Alimentos utilizados",
+            "registrado_por": "Registrado por",
+        },
     )
-
-    st.plotly_chart(fig2, use_container_width=True)
