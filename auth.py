@@ -31,7 +31,6 @@ def cadastrar_escola():
     senha = st.text_input("Senha", type="password", key="cadastro_senha")
 
     if st.button("Cadastrar instituição"):
-
         if not nome or not email or not cnpj or not inep or not senha:
             st.warning("Preencha todos os campos.")
             return
@@ -67,7 +66,6 @@ def login_escola():
     senha = st.text_input("Senha", type="password", key="login_instituicao_senha")
 
     if st.button("Entrar como instituição"):
-
         usuario = database.buscar_dados(
             """
             SELECT * FROM escolas
@@ -94,7 +92,6 @@ def login_merendeira():
     senha = st.text_input("Senha", type="password", key="login_merendeira_senha")
 
     if st.button("Entrar como merendeira"):
-
         usuario = database.buscar_dados(
             """
             SELECT m.*
@@ -119,19 +116,6 @@ def login_merendeira():
 
 
 def tela_autenticacao():
-    st.markdown(
-        """
-        <div style="text-align:center; margin-bottom: 25px;">
-            <h1 style="font-family: Lora, serif; font-size: 56px; margin-bottom: 0;">
-                Renewtri
-            </h1>
-            <p style="font-size: 20px; color: #4b5563;">
-                Menos desperdício, mais futuro
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
     aba1, aba2, aba3 = st.tabs([
         "Login Instituição",
