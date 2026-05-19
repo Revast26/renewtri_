@@ -5,7 +5,7 @@ import database
 
 
 def show_dashboard():
-    st.header("📊 Dashboard")
+    st.header("Dashboard")
 
     dados_producao = database.buscar_dados("""
         SELECT data, refeicoes_produzidas, desperdicio_kg
