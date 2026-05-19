@@ -11,28 +11,58 @@ from prediction import show_prediction
 from sustainability import show_sustainability
 
 def menu_lateral():
-    """
-    Cria o menu lateral do sistema.
-    """
+   def menu_lateral():
 
-    st.sidebar.title("🌱 Renewtri")
+    st.sidebar.markdown(
+        """
+        <div style="
+            text-align:center;
+            padding: 10px;
+            margin-bottom: 20px;
+        ">
+            <h1 style="
+                color:#10b981;
+                font-size:36px;
+                margin-bottom:0;
+            ">
+                 Renewtri
+            </h1>
+
+            <p style="
+                color:gray;
+                font-size:14px;
+            ">
+                Gestão inteligente da merenda escolar
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     st.sidebar.markdown("---")
 
-    st.sidebar.write(
-        f"Usuário: {st.session_state.tipo_usuario}"
+    st.sidebar.markdown(
+        f"""
+        ### 🏫 Escola
+        CETI Prefeito João Mendes Olímpio de Melo
+
+        ### 👤 Perfil
+        {st.session_state.tipo_usuario.capitalize()}
+        """
     )
+
+    st.sidebar.markdown("---")
 
     pagina = st.sidebar.radio(
         "Navegação",
         [
-            "Dashboard",
-            "Produção Alimentar",
-            "Alimentos Recebidos",
-            "Merendeiras",
-            "Relatórios",
-            "Previsão Inteligente",
-            "Sustentabilidade"
+            "📊 Dashboard",
+            "🍽️ Produção Alimentar",
+            "📦 Alimentos Recebidos",
+            "👩 Merendeiras",
+            "📑 Relatórios",
+            "🤖 Previsão Inteligente",
+            "♻️ Sustentabilidade"
         ]
     )
 
