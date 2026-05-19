@@ -8,6 +8,7 @@ from food_inventory import show_food_inventory
 from employees import show_employees
 from reports import show_reports
 from prediction import show_prediction
+from sustainability import show_sustainability
 
 def menu_lateral():
     """
@@ -60,7 +61,7 @@ def main():
 
     st.title("🌱 Renewtri")
     st.caption(
-        "Plataforma inteligente para gestão da merenda escolar, redução do desperdício alimentar e promoção da sustentabilidade em escolas públicas."
+        "Menos desperdício, mais futuro."
     )
 
     st.markdown("---")
@@ -94,8 +95,7 @@ def main():
             show_prediction()
 
         elif pagina == "Sustentabilidade":
-            st.header("🌱 Sustentabilidade")
-            st.info("Educação ambiental em construção.")
+            show_sustainability()  
 
 
 if __name__ == "__main__":
