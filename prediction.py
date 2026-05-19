@@ -1,99 +1,82 @@
-import streamlit as st
+from datetime import date, timedelta
+
 import pandas as pd
-import database
+import streamlit as st
+
+import database as db
+from utils import format_kg, format_percent, metric_card, page_header
 
 
-def show_prediction():
+def show_prediction(school_id: int) -> None:
+    page_header(
+        "Previsão Inteligente",
+        "Simulação baseada em médias, histórico de consumo e tendência simples de desperdício.",
+        "Análise preditiva simples",
+    )
 
-    st.header("🤖 Previsão Inteligente")
-
-    dados = database.buscar_dados("""
-        SELECT
-            refeicoes_produzidas,
-            desperdicio_kg
-        FROM producao_alimentar
-    """)
-
-    if not dados:
-
-        st.warning(
-            "Cadastre produções alimentares para gerar previsões."
-        )
-
+    production = db.production_df(school_id)
+    if production.empty or len(production) < 3:
+        st.info("Cadastre pelo menos três produções para gerar recomendações inteligentes.")
         return
 
-    df = pd.DataFrame(
-        dados,
-        columns=[
-            "Refeições",
-            "Desperdício"
-        ]
-    )
+    df = production.copy()
+    df["data"] = pd.to_datetime(df["data"])
+    df = df.sort_values("data")
 
-    media_refeicoes = df["Refeições"].mean()
+    last_14 = df[df["data"] >= df["data"].max() - pd.Timedelta(days=14)]
+    last_30 = df[df["data"] >= df["data"].max() - pd.Timedelta(days=30)]
+    average_meals = last_14["refeicoes_produzidas"].mean()
+    average_waste = last_14["desperdicio_kg"].mean()
+    waste_rate = last_30["desperdicio_kg"].sum() / last_30["refeicoes_produzidas"].sum() * 100
 
-    media_desperdicio = df["Desperdício"].mean()
+    weekday = (date.today() + timedelta(days=1)).weekday()
+    weekday_history = df[df["data"].dt.weekday == weekday]
+    if not weekday_history.empty:
+        recommended = int(round((average_meals * 0.55) + (weekday_history["refeicoes_produzidas"].tail(6).mean() * 0.45)))
+    else:
+        recommended = int(round(average_meals))
 
-    recomendacao = int(media_refeicoes * 0.95)
-
-    economia = max(
-        0,
-        100 - df["Desperdício"].sum()
-    )
-
-    st.subheader("📊 Indicadores Inteligentes")
+    current_month = pd.Timestamp.today().to_period("M")
+    previous_month = current_month - 1
+    current_waste = df[df["data"].dt.to_period("M") == current_month]["desperdicio_kg"].sum()
+    previous_waste = df[df["data"].dt.to_period("M") == previous_month]["desperdicio_kg"].sum()
+    saved = max(float(previous_waste - current_waste), 0.0)
 
     col1, col2, col3 = st.columns(3)
+    with col1:
+        metric_card("Recomendação", f"{recommended} refeições", "Preparo sugerido para amanhã")
+    with col2:
+        metric_card("Taxa atual", format_percent(waste_rate), "Últimos 30 dias")
+    with col3:
+        metric_card("Economia mensal", format_kg(saved), "Comparação com mês anterior")
 
-    col1.metric(
-        "🍽 Média de refeições",
-        f"{media_refeicoes:.0f}"
+    st.success(f"Recomendação: preparar {recommended} refeições amanhã.")
+    st.info(f"Taxa de desperdício atual: {format_percent(waste_rate)}.")
+    st.success(f"{format_kg(saved)} foram economizados este mês.")
+
+    st.subheader("Como a previsão foi calculada")
+    st.markdown(
+        f"""
+        <div class="info-card">
+            <p><strong>Média dos últimos 14 dias:</strong> {average_meals:.0f} refeições por registro.</p>
+            <p><strong>Média de desperdício recente:</strong> {average_waste:.1f} kg por registro.</p>
+            <p><strong>Comparação histórica:</strong> a recomendação combina média recente com registros do mesmo dia da semana.</p>
+            <p><strong>Leitura operacional:</strong> se a taxa passar de 10%, a equipe deve reduzir preparo inicial e acompanhar aceitação do cardápio.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    col2.metric(
-        "🗑 Taxa média de desperdício",
-        f"{media_desperdicio:.1f} kg"
-    )
-
-    col3.metric(
-        "🌱 Kg economizados",
-        f"{economia:.1f} kg"
-    )
-
-    st.markdown("---")
-
-    st.subheader("🧠 Recomendações do Sistema")
-
-    st.success(
-        f"Recomendação: preparar aproximadamente {recomendacao} refeições amanhã."
-    )
-
-    if media_desperdicio > 10:
-
-        st.warning(
-            "Atenção: a taxa de desperdício está elevada."
-        )
-
+    if waste_rate > 10:
+        st.warning("A taxa está acima da meta sugerida de 10%. Revise cardápios com baixa aceitação e dias de menor frequência.")
+    elif waste_rate > 6:
+        st.info("A taxa está controlada, mas ainda há espaço para reduzir sobras com ajustes finos por turno.")
     else:
+        st.success("A taxa está em nível muito bom para demonstração do MVP.")
 
-        st.info(
-            "A taxa de desperdício está sob controle."
-        )
-
-    st.markdown("---")
-
-    st.subheader("🌱 Impacto Sustentável")
-
-    st.write(
-        """
-        O Renewtri analisa os dados registrados para ajudar escolas a:
-        
-        ✅ reduzir desperdícios
-        
-        ✅ otimizar produção
-        
-        ✅ melhorar planejamento alimentar
-        
-        ✅ fortalecer práticas sustentáveis
-        """
+    st.subheader("Histórico usado na análise")
+    st.dataframe(
+        df.tail(12).sort_values("data", ascending=False),
+        use_container_width=True,
+        hide_index=True,
     )
