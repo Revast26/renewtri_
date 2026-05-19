@@ -10,28 +10,15 @@ from reports import show_reports
 from prediction import show_prediction
 from sustainability import show_sustainability
 
-def menu_lateral():
-   def menu_lateral():
 
+def menu_lateral():
     st.sidebar.markdown(
         """
-        <div style="
-            text-align:center;
-            padding: 10px;
-            margin-bottom: 20px;
-        ">
-            <h1 style="
-                color:#10b981;
-                font-size:36px;
-                margin-bottom:0;
-            ">
-                 Renewtri
+        <div style="padding: 8px 0 18px 0;">
+            <h1 style="font-size: 28px; margin-bottom: 4px; color: #ffffff;">
+                Renewtri
             </h1>
-
-            <p style="
-                color:gray;
-                font-size:14px;
-            ">
+            <p style="font-size: 14px; color: #d1d5db; margin-top: 0;">
                 Gestão inteligente da merenda escolar
             </p>
         </div>
@@ -43,11 +30,8 @@ def menu_lateral():
 
     st.sidebar.markdown(
         f"""
-        ### 🏫 Escola
-        CETI Prefeito João Mendes Olímpio de Melo
-
-        ### 👤 Perfil
-        {st.session_state.tipo_usuario.capitalize()}
+        **Escola:** CETI Prefeito João Mendes Olímpio de Melo  
+        **Perfil:** {st.session_state.tipo_usuario.capitalize()}
         """
     )
 
@@ -56,13 +40,13 @@ def menu_lateral():
     pagina = st.sidebar.radio(
         "Navegação",
         [
-            "📊 Dashboard",
-            "🍽️ Produção Alimentar",
-            "📦 Alimentos Recebidos",
-            "👩 Merendeiras",
-            "📑 Relatórios",
-            "🤖 Previsão Inteligente",
-            "♻️ Sustentabilidade"
+            "Dashboard",
+            "Produção Alimentar",
+            "Alimentos Recebidos",
+            "Merendeiras",
+            "Relatórios",
+            "Previsão Inteligente",
+            "Sustentabilidade"
         ]
     )
 
@@ -75,57 +59,47 @@ def menu_lateral():
 
 
 def main():
-    """
-    Função principal do app.
-    """
-
     st.set_page_config(
         page_title="Renewtri",
-        page_icon="🌱",
+        page_icon="R",
         layout="wide"
     )
 
     database.init_db()
-
+    database.criar_dados_demo()
     auth.init_session()
 
-    st.title("🌱 Renewtri")
-    st.caption(
-        "Menos desperdício, mais futuro."
-    )
+    st.title("Renewtri")
+    st.caption("Menos desperdício, mais futuro")
 
     st.markdown("---")
 
-    # Usuário NÃO logado
     if not st.session_state.logado:
-
         auth.tela_autenticacao()
+        return
 
-    # Usuário logado
-    else:
+    pagina = menu_lateral()
 
-        pagina = menu_lateral()
+    if pagina == "Dashboard":
+        show_dashboard()
 
-        if pagina == "Dashboard":
-            show_dashboard()    
+    elif pagina == "Produção Alimentar":
+        show_food_production()
 
-        elif pagina == "Produção Alimentar":
-            show_food_production()
+    elif pagina == "Alimentos Recebidos":
+        show_food_inventory()
 
-        elif pagina == "Alimentos Recebidos":
-            show_food_inventory()
+    elif pagina == "Merendeiras":
+        show_employees()
 
-        elif pagina == "Merendeiras":
-            show_employees()
+    elif pagina == "Relatórios":
+        show_reports()
 
-        elif pagina == "Relatórios":
-            show_reports()
+    elif pagina == "Previsão Inteligente":
+        show_prediction()
 
-        elif pagina == "Previsão Inteligente":
-            show_prediction()
-
-        elif pagina == "Sustentabilidade":
-            show_sustainability()  
+    elif pagina == "Sustentabilidade":
+        show_sustainability()
 
 
 if __name__ == "__main__":
